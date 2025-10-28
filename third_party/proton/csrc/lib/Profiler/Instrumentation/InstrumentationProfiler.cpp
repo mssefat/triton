@@ -145,24 +145,9 @@ void InstrumentationProfiler::initFunctionMetadata(
     }
     functionScopeIdNames[functionId][scopeId] = scopeName;
   }
-  // Synthesize the calling contexts
-  std::map<size_t, size_t> scopeIdParentMap;
-  for (auto &pair : scopeIdParentPairs) {
-    auto scopeId = pair.first;
-    auto parentId = pair.second;
-    scopeIdParentMap[scopeId] = parentId;
-  }
+  // Build flat contexts (no hierarchy)
   for (auto &[scopeId, name] : functionScopeIdNames[functionId]) {
-    std::vector<Context> contexts = {name};
-    auto currentId = scopeId;
-    while (scopeIdParentMap.count(currentId) > 0) {
-      auto parentId = scopeIdParentMap[currentId];
-      auto parentName = functionScopeIdNames[functionId].at(parentId);
-      contexts.emplace_back(parentName);
-      currentId = parentId;
-    }
-    std::reverse(contexts.begin(), contexts.end());
-    functionScopeIdContexts[functionId][scopeId] = contexts;
+    functionScopeIdContexts[functionId][scopeId] = {name};
   }
   functionMetadata.emplace(functionId, InstrumentationMetadata(metadataPath));
 }

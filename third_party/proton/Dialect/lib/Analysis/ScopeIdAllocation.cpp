@@ -1,7 +1,5 @@
 #include "Analysis/ScopeIdAllocation.h"
 
-#include <stack>
-
 namespace mlir {
 namespace triton::proton {
 
@@ -11,45 +9,44 @@ namespace triton::proton {
 
 void ScopeIdAllocation::run() {
   llvm::StringMap<size_t> nameToIdMap;
-  std::stack<ScopeId> scopeIdStack;
+  llvm::StringMap<size_t> activeScopes;
   ScopeId id = 0;
 
   funcOp->walk<WalkOrder::PreOrder>([&](RecordOp recordOp) {
     auto name = recordOp.getName();
     LDBG("Processing RecordOp: " << recordOp);
     if (recordOp.getIsStart()) {
-      if (!nameToIdMap.contains(name)) {
-        nameToIdMap[name] = id;
-        idToNameMap[id] = name;
-        LDBG("Assigning new scope id " << id << " to name '" << name << "'");
-        opToIdMap[recordOp] = id;
-        if (!scopeIdStack.empty()) {
-          scopeParentIds.push_back({id, scopeIdStack.top()});
-        }
-        scopeIdStack.push(id);
-        id++;
-      } else {
+      if (activeScopes.contains(name)) {
         mlir::emitError(recordOp.getLoc(), "The scope name '")
-            << name << "' must appear in pairs";
+            << name << "' is already open";
+      } else {
+        if (!nameToIdMap.contains(name)) {
+          nameToIdMap[name] = id;
+          idToNameMap[id] = name;
+          LDBG("Assigning new scope id " << id << " to name '" << name << "'");
+          id++;
+        }
+        opToIdMap[recordOp] = nameToIdMap[name];
+        activeScopes[name] = nameToIdMap[name];
       }
     } else {
-      if (nameToIdMap.contains(name)) {
-        scopeIdStack.pop();
-        opToIdMap[recordOp] = nameToIdMap.lookup(name);
-        nameToIdMap.erase(name);
+      if (activeScopes.contains(name)) {
+        opToIdMap[recordOp] = activeScopes[name];
+        activeScopes.erase(name);
       } else {
         mlir::emitError(recordOp.getLoc(), "The scope name '")
-            << name << "' must appear in pairs";
+            << name << "' was not opened or already closed";
       }
     }
   });
 
-  if (nameToIdMap.size() > 0) {
-    for (auto &[name, _] : nameToIdMap) {
+  if (activeScopes.size() > 0) {
+    for (auto &[name, _] : activeScopes) {
       mlir::emitError(funcOp->getLoc(), "Scope name '")
-          << name << "' must appear in pairs";
+          << name << "' was opened but never closed";
     }
   }
+  // Note: scopeParentIds is intentionally left empty (no hierarchy tracking)
 }
 
 ModuleScopeIdAllocation::ModuleScopeIdAllocation(ModuleOp moduleOp)
@@ -74,13 +71,8 @@ ModuleScopeIdAllocation::ModuleScopeIdAllocation(ModuleOp moduleOp)
     for (auto &p : names)
       p.first += offset;
     scopeIdNames[funcOp] = std::move(names);
-    // Parents
-    auto parents = funcMap.lookup(funcOp).getScopeIdParents();
-    for (auto &p : parents) {
-      p.first += offset;
-      p.second += offset;
-    }
-    scopeIdParents[funcOp] = std::move(parents);
+    // Parents - intentionally left empty, no hierarchy tracking
+    scopeIdParents[funcOp] = ScopeIdAllocation::ScopeIdParent{};
   }
 }
 
