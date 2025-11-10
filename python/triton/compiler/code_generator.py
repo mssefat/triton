@@ -6,7 +6,6 @@ import inspect
 import re
 import warnings
 import textwrap
-import itertools
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Callable, Dict, Optional, Tuple, Type, Union, Iterable, List
@@ -1403,7 +1402,6 @@ class CodeGenerator(ast.NodeVisitor):
 
         kws = dict(self.visit(keyword) for keyword in node.keywords)
         args = [self.visit(arg) for arg in node.args]
-        args = list(itertools.chain.from_iterable(x if isinstance(x, list) else [x] for x in args))
 
         return self.call_Function(node, fn, args, kws)
 

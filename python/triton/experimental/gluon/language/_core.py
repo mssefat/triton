@@ -8,8 +8,9 @@ if TYPE_CHECKING:
     from triton._C.libtriton.gluon_ir import GluonOpBuilder
     from ._semantic import GluonSemantic
 
-from ._layouts import SharedLayout, DistributedLayout, BlockedLayout, DotOperandLayout, AutoLayout
+from ._layouts import SharedLayout, DistributedLayout, BlockedLayout, DotOperandLayout, AutoLayout, _materialize_linear_layout_builtin
 from triton._C.libtriton import ir
+from triton.runtime.jit import constexpr_function
 import triton.language.core as tl_core
 from triton.language.core import (
     constexpr,
@@ -576,13 +577,6 @@ def to_linear_layout(layout, shape, _semantic=None):
 
 
 @builtin
-def print_layout(layout, shape, _semantic=None):
-    layout = _unwrap_if_constexpr(layout)
-    shape = _unwrap_shape(shape)
-    return _semantic.print_layout(layout, shape)
-
-
-@builtin
 def dot_fma(a, b, acc, _semantic=None):
     assert isinstance(a, tensor), "a must be a tensor"
     assert isinstance(b, tensor), "b must be a tensor"
@@ -604,3 +598,19 @@ def dot_fma(a, b, acc, _semantic=None):
 
     handle = _semantic.dot(a, b, acc, input_precision=None, max_num_imprecise_acc=None, out_dtype=acc.dtype).handle
     return tensor(handle, acc.type)
+
+
+@constexpr_function
+def print_layout(layout, shape):
+
+    def _unwrap(x):
+        if isinstance(x, constexpr):
+            return _unwrap(x.value)
+        if isinstance(x, list):
+            return [_unwrap(i) for i in x]
+        if isinstance(x, tuple):
+            return tuple(_unwrap(i) for i in x)
+        return x
+
+    linear_layout = _materialize_linear_layout_builtin(_unwrap(layout), _unwrap(shape))
+    print(linear_layout)

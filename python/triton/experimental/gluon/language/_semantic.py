@@ -315,16 +315,6 @@ class GluonSemantic(TritonSemantic[TensorTy]):
 
         return ttgl.constexpr(self.builder.to_linear_layout(layout._to_ir(self.builder), shape))
 
-    def print_layout(self, layout, shape):
-        layout = ttgl._unwrap_if_constexpr(layout)
-        _check(not isinstance(layout, AutoLayout), lambda: "print_layout requires a resolved layout, got AutoLayout")
-
-        _check(all(isinstance(dim, int) for dim in shape),
-               lambda: f"print_layout shape entries must be ints, got {shape}")
-
-        ll = self.builder.materialize_linear_layout(layout._to_ir(self.builder), shape)
-        print(ll)
-
     def shared_dealloc(self, mem_desc):
         self.builder.create_local_dealloc(mem_desc.handle)
 
