@@ -1504,6 +1504,19 @@ def test_to_linear_layout(layout, expected):
     run_parser(kernel, args=(layout, expected, tuple(expected.shape)), target=AMPERE_TARGET)
 
 
+def test_print_layout(capsys):
+    layout = ttgl.BlockedLayout([1], [32], [1], [0])
+
+    @gluon.jit
+    def kernel(layout: ttgl.constexpr):
+        ttgl.print_layout(layout, [32])
+
+    run_parser(kernel, args=(layout, ), target=AMPERE_TARGET)
+    output = capsys.readouterr().out
+    assert "lane=" in output
+    assert "where out dims are" in output
+
+
 @filecheck_test
 @gluon.jit
 def test_zeros():

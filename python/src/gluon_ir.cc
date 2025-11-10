@@ -367,8 +367,22 @@ void init_gluon_ir(py::module &&m) {
               std::vector<int64_t> &shape) -> py::object {
              auto ctx = self.getContext();
              auto linearLayout = ttg::toLinearLayout(shape, layout);
-             auto attr = ttg::LinearEncodingAttr::get(ctx, linearLayout);
+             Attribute attr;
+             if (isa<ttg::DistributedEncodingTrait>(layout)) {
+               attr = ttg::LinearEncodingAttr::get(ctx, linearLayout);
+             } else {
+               assert(isa<ttg::SharedEncodingTrait>(layout));
+               auto alignment =
+                   cast<ttg::SharedEncodingTrait>(layout).getAlignment();
+               attr = ttg::SharedLinearEncodingAttr::get(ctx, linearLayout,
+                                                         alignment);
+             }
              return layoutToGluon(attr);
+           })
+      .def("materialize_linear_layout",
+           [](GluonOpBuilder &self, Attribute layout,
+              std::vector<int64_t> &shape) -> tt::LinearLayout {
+             return ttg::toLinearLayout(shape, layout);
            })
       .def("get_dot_operand_layout",
            [](GluonOpBuilder &self, unsigned opIdx, Attribute parent,

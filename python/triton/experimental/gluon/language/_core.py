@@ -576,6 +576,13 @@ def to_linear_layout(layout, shape, _semantic=None):
 
 
 @builtin
+def print_layout(layout, shape, _semantic=None):
+    layout = _unwrap_if_constexpr(layout)
+    shape = _unwrap_shape(shape)
+    return _semantic.print_layout(layout, shape)
+
+
+@builtin
 def dot_fma(a, b, acc, _semantic=None):
     assert isinstance(a, tensor), "a must be a tensor"
     assert isinstance(b, tensor), "b must be a tensor"
